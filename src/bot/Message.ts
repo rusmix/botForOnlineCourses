@@ -26,7 +26,7 @@ export interface IDocument extends IMessageObject, Document {
 }
 
 export interface IModel extends Model<IMessageObject, IDocument> {
-  createIfNotExists(user: IMessage): Promise<IMessageObject>;
+  createIfNotExists(tgId: string): Promise<IMessageObject>;
   findLastMessageTelegramId(): Promise<number>;
 }
 
@@ -58,7 +58,13 @@ UserSchema.statics.findLastMessageTelegramId = async function (
     return undefined;
   }
 };
-
+UserSchema.statics.createIfNotExists = async function (
+    tgId: string
+  ): Promise<void> {
+    const msg =await Messages.findOne({telegramId: tgId});
+    if (msg) return;
+    await new Messages({ telegramId: tgId }).save();
+  }
 export const Messages = model<IDocument, IModel>(
   "Messages",
   UserSchema,

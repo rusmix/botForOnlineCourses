@@ -54,7 +54,7 @@ export class BotStrategies {
       const userId = ctx.message.from.id;
       this.bot.telegram.sendMessage(
         userId,
-        "Don’t panic!\n\nЕсли нужно посмотреть расписание, команда /timetable\nПоследнее задание - /homework\nЗапросить звонок с Полиной - /call\n\nДля того, чтобы сдать домашнее задание - просто отправьте его в чат\n\nЕсть вопросы? - пишите сюда же, бот приведёт помощь)"
+        "<b> Don’t panic! </b>\n\nЕсли нужно посмотреть расписание, команда /timetable\nПоследнее задание - /homework\nЗапросить звонок с Полиной - /call\n\nДля того, чтобы сдать домашнее задание - просто отправьте его в чат\n\nЕсть вопросы? - пишите сюда же, бот приведёт помощь)"
       );
     } catch (e) {
       console.log(e);
@@ -92,25 +92,34 @@ export class BotStrategies {
   // }
 
   private async getCall(ctx: Context) {
-    const userId = ctx.message.from.id;
-    this.bot.telegram.sendMessage(userId, "Ищем время для звонка!");
-    await this.bot.telegram.sendMessage(
-      config.adminId,
-      "Кто-то хочет связаться:"
-    );
-    ctx.forwardMessage(config.adminId);
+    try {
+      const userId = ctx.message.from.id;
+      this.bot.telegram.sendMessage(userId, "Ищем время для звонка!");
+      await this.bot.telegram.sendMessage(
+        config.adminId,
+        "Кто-то хочет связаться:"
+      );
+      ctx.forwardMessage(config.adminId);
+    } catch (e) {
+      console.log(e);
+    }
   }
 
   private async getHomework(ctx: Context) {
-    const msgId = await Messages.findLastMessageTelegramId();
-    const userId = ctx.message.from.id;
-    if (!msgId) {
-      this.bot.telegram.sendMessage(userId, "ДЗ пока нет.");
-      return;
+    try {
+      const msgId = await Messages.findLastMessageTelegramId();
+      const userId = ctx.message.from.id;
+      if (!msgId) {
+        this.bot.telegram.sendMessage(userId, "ДЗ пока нет.");
+        ctx.deleteMessage();
+        return;
+      }
+      await this.bot.telegram.sendMessage(userId, "Вот последнее ДЗ:");
+      this.bot.telegram.copyMessage(userId, config.adminId, msgId);
+      ctx.deleteMessage();
+    } catch (e) {
+      console.log(e);
     }
-    await this.bot.telegram.sendMessage(userId, "Вот последнее ДЗ:");
-    this.bot.telegram.copyMessage(userId, config.adminId, msgId);
-    ctx.deleteMessage();
   }
 
   private async start(ctx: Context) {
@@ -144,68 +153,74 @@ export class BotStrategies {
     }
   }
   private async handleMessageFromAdmin(ctx: Context) {
-    const message = ctx.message as TgMessage;
-    if (message.reply_to_message) {
-      if (message?.text.split(" ")[0] == "/timeForCall")
-        return this.replyAndGiveSchedule(ctx);
-      return this.replyAndHelp(ctx);
-    }
-    return this.sendMessageToAll(ctx);
-  }
-
-  private async sendMessageToAll(ctx: Context) {
-    const message = ctx.message as TgMessage;
-    const usersIds = await Users.findAllTelegramIds();
-    await new Messages({ telegramId: message.message_id }).save();
-    usersIds.forEach((id) => {
-      this.bot.telegram.copyMessage(id, config.adminId, message.message_id);
-      // this.sendAnyDocument(id, ctx);
-    });
-  }
-
-  private async sendAnyDocument(userId: string, ctx: Context) {
-    const message = ctx.message as TgMessage;
-    const [text, file_id] = [
-      message.text || message.caption,
-      (
-        ((message.photo ? message.photo.slice(-1)[0] : false) ||
-          message.document ||
-          message.sticker ||
-          message.voice) as TgAsset
-      )?.file_id,
-    ];
-    if (text) await this.bot.telegram.sendMessage(userId, text);
-    if (file_id) {
-      try {
-        await this.bot.telegram.sendPhoto(userId, file_id);
-      } catch {
-        await this.bot.telegram.sendDocument(userId, file_id);
+    try {
+      const message = ctx.message as any; //TgMessage;
+      if (message.reply_to_message) {
+        if ("text" in message.reply_to_message)
+          if (message?.reply_to_message.text.split(" ")[0] == "/call")
+            return this.replyAndGiveSchedule(ctx);
+        return this.replyAndHelp(ctx);
       }
+      return this.setHomework(ctx);
+    } catch (e) {
+      console.log(e);
+    }
+  }
+
+  private async setHomework(ctx: Context) {
+    try {
+      const message = ctx.message as TgMessage;
+      await Messages.createIfNotExists(message.message_id as unknown as string);
+    } catch (e) {
+      console.log(e);
     }
   }
 
   private async replyAndGiveSchedule(ctx: Context) {
     const message = ctx.message as TgMessage;
-    const availableTime = message?.text.replace("/settime", "");
+    const availableTime = message?.text; //.replace("/settime", "");
     const userId = String(message.reply_to_message.forward_from?.id);
     this.bot.telegram.sendMessage(
       userId,
-      `Доступное время для звонка: ${availableTime}\nНапишите, во сколько Вам было бы удобно созвониться, и в назначенное время наберите Полину: t.me/pollebedeva`
+      `Доступное время для звонка: ${availableTime}\nНапишите здесь, во сколько Вам было бы удобно созвониться, и в назначенное время наберите Полину: t.me/pollebedeva`
     );
   }
-
+  //451612433
   private async replyAndHelp(ctx: Context) {
-    const message = ctx.message as TgMessage;
-    if (message?.text[0] == "/") return;
-    if (String(message.from.id) == config.adminId) return;
+    try {
+      const message = ctx.message as any; //TgMessage;
+      if ("text" in message) {
+        if (message.text[0] == "/") return;
+      }
+      // if (String(message.from.id) != config.adminId) return;
 
-    const userId = String(message.reply_to_message.forward_from?.id);
+      const userId = message.reply_to_message.forward_from?.id;
 
-    this.sendAnyDocument(userId, ctx);
+      await this.bot.telegram.copyMessage(
+        userId,
+        config.adminId,
+        message.message_id
+      );
+    } catch (e) {
+      console.log("______catch______");
+      console.log(e);
+      if (e.response.error_code == 403) {
+        // Users.deleteOne({telegramId: e.on.payload.chat_id});
+        this.bot.telegram.sendMessage(
+          config.adminId,
+          "Сообщение не доставлено, пользователь заблокировал бота."
+        );
+      }
+    }
   }
 
   private async handleMessageFromUser(ctx: Context) {
-    if ((ctx as any).message?.text[0] == "/") return;
-    return ctx.forwardMessage(config.adminId);
+    try {
+      const message = (ctx as any).message;
+      if ("text" in message) if (message?.text[0] == "/") return;
+      return ctx.forwardMessage(config.adminId);
+    } catch (e) {
+      console.log(e);
+    }
   }
 }
