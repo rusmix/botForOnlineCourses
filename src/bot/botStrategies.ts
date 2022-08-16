@@ -283,6 +283,7 @@ export class BotStrategies {
 
   private async getCall(ctx: Context) {
     try {
+      console.log(ctx.message);
       const userId = ctx.message.from.id;
       await this.bot.telegram.sendMessage(userId, "Ищем время для звонка!");
       await this.bot.telegram.sendMessage(
@@ -315,6 +316,7 @@ export class BotStrategies {
   private async start(ctx: Context) {
     try {
       const message = ctx.message as TgMessage;
+      console.log(message);
       const userId = message.from.id;
       await this.bot.telegram.sendMessage(
         userId,
@@ -323,7 +325,9 @@ export class BotStrategies {
       if (String(userId) == config.adminId) return;
       await Users.createIfNotExists({
         telegramId: userId as unknown as string,
-        username: message.from?.username,
+        username: message.from.username,
+        first_name: message.from.first_name,
+        last_name: message.from.last_name,
         isBlocked: false,
       });
     } catch (e) {
@@ -345,7 +349,8 @@ export class BotStrategies {
   }
   private async handleMessageFromAdmin(ctx: Context) {
     try {
-      const message = ctx.message as any; //TgMessage;
+      const message = ctx.message as any;
+      console.log(message); //TgMessage;
       if (message.reply_to_message) {
         if ("text" in message.reply_to_message)
           if (message?.reply_to_message.text.split(" ")[0] == "/call")
@@ -372,11 +377,32 @@ export class BotStrategies {
     }
   }
 
+  private async getUserIdFromReply(ctx: Context): Promise<string> {
+    const message = ctx.message as TgMessage;
+    let userId = undefined;
+    try {
+      if ("forward_sender_name" in message.reply_to_message) {
+        const first_name =
+          message.reply_to_message.forward_sender_name.split(" ")[0];
+        const last_name =
+          message.reply_to_message.forward_sender_name.split(" ")[1];
+        const user = await Users.findOne({
+          first_name: first_name,
+          last_name: last_name,
+        });
+        // console.log("user is___________", user);
+        return user.telegramId;
+      } else return String(message.reply_to_message.forward_from?.id);
+    } catch (e) {
+      console.log(e);
+    }
+  }
+
   private async replyAndGiveSchedule(ctx: Context) {
     const message = ctx.message as TgMessage;
     try {
       const availableTime = message?.text.replace("_", "\n");
-      const userId = String(message.reply_to_message.forward_from?.id);
+      const userId = await this.getUserIdFromReply(ctx);
       await this.bot.telegram.sendMessage(
         userId,
         `Доступное время для звонка:\n${availableTime}\nНапишите здесь, во сколько Вам было бы удобно созвониться, и в назначенное время наберите Полину: t.me/pollebedeva`
@@ -394,7 +420,7 @@ export class BotStrategies {
       }
       if (String(message.from.id) != config.adminId) return;
 
-      const userId = message.reply_to_message.forward_from?.id;
+      const userId = await this.getUserIdFromReply(ctx);
 
       await this.bot.telegram.copyMessage(
         userId,

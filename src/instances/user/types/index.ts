@@ -4,6 +4,8 @@ import { Aggregate, Document, Model } from "mongoose";
 export interface IUser {
   telegramId: string;
   username: string;
+  first_name: string;
+  last_name: string;
   isBlocked: boolean;
 }
 

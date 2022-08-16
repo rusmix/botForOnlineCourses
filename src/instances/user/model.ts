@@ -13,6 +13,12 @@ const UserSchema = new Schema<IDocument, IModel>(
     username: {
       type: Types.String,
     },
+    first_name: {
+      type: Types.String,
+    },
+    last_name: {
+      type: Types.String,
+    },
     isBlocked: {
       type: Types.Boolean,
       default: false,
@@ -45,6 +51,9 @@ UserSchema.statics.createIfNotExists = async function (
   return new Users({
     telegramId: user.telegramId,
     username: user?.username,
+    first_name: user?.first_name,
+    last_name: user?.last_name,
+    isBlocked: false,
   }).save();
 };
 
