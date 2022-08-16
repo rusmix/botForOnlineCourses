@@ -4,7 +4,7 @@ import { Users } from "../instances/user/model";
 import { Update, Message, User } from "typegram";
 import { Config as config } from "./config";
 import { Messages } from "./Message";
-import { createTextChangeRange } from "typescript";
+import { convertToObject, createTextChangeRange } from "typescript";
 import { error } from "console";
 import { Schedules } from "./Schedule";
 const fs = require("fs");
@@ -52,8 +52,6 @@ export class BotStrategies {
 
     this.bot.hears(/\/sched/, (ctx: Context) => this.editSchedule(ctx));
 
-    // this.bot.hears(/\/broadcast/, (ctx: Context) => this.broadcast(ctx));
-
     this.bot.on("message", (ctx: Context) => this.handleMessage(ctx));
 
     console.log("BotStrategies initialization ended.");
@@ -66,16 +64,19 @@ export class BotStrategies {
     try {
       // await Users.remove();
       const res = await Users.findAllTelegramIds();
+      if (res.length === 0) {
+        await this.bot.telegram.sendMessage(
+          config.adminId,
+          "Никто Вас не слышит."
+        );
+        return;
+      }
       console.log(res);
       let text = undefined;
 
       if ("text" in message) {
         text = message.text.replace("/broadcast", "\n");
-      } else
-        text = message.caption.replace(
-          "/broadcast",
-          "\n"
-        );
+      } else text = message.caption.replace("/broadcast", "\n");
 
       // text =
       //   message.text.replace("/broadcast", "") ||
@@ -88,10 +89,7 @@ export class BotStrategies {
         );
         console.log(msg);
         if ("text" in message) {
-          text = message.text.replace(
-            "/broadcast",
-            "\n"
-          );
+          text = message.text.replace("/broadcast", "\n");
           await this.bot.telegram.editMessageText(
             res[i],
             msg.message_id,
@@ -99,10 +97,7 @@ export class BotStrategies {
             text
           );
         } else {
-          text = message.caption.replace(
-            "/broadcast",
-            "alert!! новое сообщение)\n"
-          );
+          text = message.caption.replace("/broadcast", "\n");
           await this.bot.telegram.editMessageCaption(
             res[i],
             msg.message_id,
@@ -122,6 +117,7 @@ export class BotStrategies {
     const message = ctx.message as TgMessage;
     try {
       const userId = message.from.id;
+      ctx.deleteMessage();
       await this.bot.telegram.sendMessage(
         userId,
         "Отправьте домашнее задание ответным сообщением или вложенным файлом. Не используйте голосовые сообщения. Постарайтесь уложиться в одно сообщение, так удобнее проверять 😉"
@@ -210,16 +206,29 @@ export class BotStrategies {
       const res = await Users.find();
       let clients = [];
       for (let i = 0; i < res.length; i++) {
-          clients.push({
-            username: res[i].username,
-            telegramId: res[i].telegramId,
-          });
+        clients.push({
+          username: res[i].username,
+          telegramId: res[i].telegramId,
+        });
       }
       let text = "Вот список пользователей:\n\n";
       for (let i = 0; i < res.length; i++) {
         if (clients[i].username === undefined)
-        text = text + (i+1) + ") Ссылка отсутствует.\nТелеграм ID: "+ clients[i].telegramId + "\n\n";
-        else text = text + (i+1) +") Ссылка: t.me/" + clients[i].username + "\nТелеграм ID: " + clients[i].telegramId + "\n\n";
+          text =
+            text +
+            (i + 1) +
+            ") Ссылка отсутствует.\nТелеграм ID: " +
+            clients[i].telegramId +
+            "\n\n";
+        else
+          text =
+            text +
+            (i + 1) +
+            ") Ссылка: t.me/" +
+            clients[i].username +
+            "\nТелеграм ID: " +
+            clients[i].telegramId +
+            "\n\n";
       }
       // console.log(text);
       // console.log(clients);
@@ -229,10 +238,14 @@ export class BotStrategies {
     }
   }
   private async getTimetable(ctx: Context) {
+    const userId = ctx.message.from.id;
     try {
       console.log("timetable");
-      console.log(ctx); 
-      const userId = ctx.message.from.id;
+      console.log(ctx);
+      if (Number(config.adminId) === userId) {
+        await this.getTimetableAdmin(ctx);
+        return;
+      }
       const res = await Schedules.findOne();
       const text = res.text;
       await this.bot.telegram.sendMessage(
@@ -242,22 +255,31 @@ export class BotStrategies {
       await ctx.deleteMessage();
     } catch (e) {
       console.log(e);
-      ctx.reply("Unknown error accured: ", e.message);
+      // ctx.reply("Unknown error accured: ", e.message);
     }
   }
 
-  // private async menu(ctx: Context) {
-  //   ctx.deleteMessage();
-  //   const keyboard = Markup.inlineKeyboard([
-  //     Markup.button.callback("    Call   ", "getcall"),
-  //     Markup.button.callback("   Timetable     ", "timetable"),
-  //     Markup.button.callback("   Homework     ", "homework"),
-  //   ]);
-  //   ctx.reply("Hello", keyboard);
-  //   this.bot.action("getcall", (ctx: Context) => this.getCall(ctx));
-  //   this.bot.action("timetable", (ctx: Context) => this.getTimetable(ctx));
-  //   this.bot.action("homework", (ctx: Context) => this.getHomework(ctx));
-  // }
+  private async getTimetableAdmin(ctx: Context) {
+    const userId = ctx.message.from.id;
+    try {
+      const res = await Schedules.findOne();
+      let text = res.text;
+      console.log(text);
+      let newText = [];
+      for (let i = 0; i < text.length; i++) {
+        newText.push(`${i + 1}) ` + text[i]);
+      }
+      console.log(text);
+      const msg = await this.bot.telegram.sendMessage(
+        config.adminId,
+        `Расписание:\n${newText.join("")}`
+      );
+      console.log(msg);
+      await ctx.deleteMessage();
+    } catch (e) {
+      console.log(e);
+    }
+  }
 
   private async getCall(ctx: Context) {
     try {
@@ -343,6 +365,7 @@ export class BotStrategies {
   private async setHomework(ctx: Context) {
     try {
       const message = ctx.message as TgMessage;
+      if ("text" in message && message.text[0] == "/") return;
       await Messages.createIfNotExists(message.message_id as unknown as string);
     } catch (e) {
       console.log(e);
@@ -392,7 +415,7 @@ export class BotStrategies {
         await Users.deleteOne({ telegramId: e.on.payload.chat_id });
         await this.bot.telegram.sendMessage(
           config.adminId,
-          "Сообщение не доставлено, пользователь заблокировал бота."
+          "Сообщение не доставлено, один или несколько пользователей заблокировал бота. Записи в базе данных были отредактированы."
         );
       } else
         await this.bot.telegram.sendMessage(
