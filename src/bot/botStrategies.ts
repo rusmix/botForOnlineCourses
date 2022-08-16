@@ -230,7 +230,7 @@ export class BotStrategies {
   private async getTimetable(ctx: Context) {
     try {
       console.log("timetable");
-      console.log(ctx);
+      console.log(ctx); 
       const userId = ctx.message.from.id;
       const res = await Schedules.findOne();
       const text = res.text;
@@ -291,7 +291,8 @@ export class BotStrategies {
 
   private async start(ctx: Context) {
     try {
-      const userId = ctx.message.from.id;
+      const message = ctx.message as TgMessage;
+      const userId = message.from.id;
       await this.bot.telegram.sendMessage(
         userId,
         "Добро пожаловать на онлайн курс!\nЧтобы отправить домашнее задание на проверку - просто отправьте его в этот чат!"
@@ -299,7 +300,7 @@ export class BotStrategies {
       if (String(userId) == config.adminId) return;
       await Users.createIfNotExists({
         telegramId: userId as unknown as string,
-        username: ctx.message.from?.username,
+        username: message.from?.username,
         isBlocked: false,
       });
     } catch (e) {
@@ -415,6 +416,8 @@ export class BotStrategies {
 
   private async mongoSchedule() {
     try {
+      await Messages.remove();
+      await Users.remove();
       // await Schedules.remove();
       const res = await Schedules.find();
       // console.log(res[0].text);
