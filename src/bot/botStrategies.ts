@@ -62,6 +62,7 @@ export class BotStrategies {
   private async broadcast(ctx: Context) {
     const message = ctx.message as TgMessage;
     if (message.from.id !== Number(config.adminId)) return;
+    console.log(message.text);
     try {
       // await Users.remove();
       const res = await Users.findAllTelegramIds();
@@ -69,11 +70,11 @@ export class BotStrategies {
       let text = undefined;
 
       if ("text" in message) {
-        text = message.text.replace("/broadcast", "alert!! новое сообщение)\n");
+        text = message.text.replace("/broadcast", "\n");
       } else
         text = message.caption.replace(
           "/broadcast",
-          "alert!! новое сообщение)\n"
+          "\n"
         );
 
       // text =
@@ -89,7 +90,7 @@ export class BotStrategies {
         if ("text" in message) {
           text = message.text.replace(
             "/broadcast",
-            "alert!! новое сообщение)\n"
+            "\n"
           );
           await this.bot.telegram.editMessageText(
             res[i],
@@ -416,8 +417,8 @@ export class BotStrategies {
 
   private async mongoSchedule() {
     try {
-      await Messages.remove();
-      await Users.remove();
+      // await Messages.remove();
+      // await Users.remove();
       // await Schedules.remove();
       const res = await Schedules.find();
       // console.log(res[0].text);
@@ -431,7 +432,7 @@ export class BotStrategies {
             "20.08 - Письменная активность 2\n",
             "22.08 - Письменная активность 3\n",
             "18.08 - Письменная активность 1\n",
-            "24.08 - Zoom в 19:00 по Мск",
+            "24.08 - Zoom в 19:00 по Мск\n",
           ],
         }).save();
         // console.log(res);
