@@ -30,7 +30,7 @@ export interface IModel extends Model<IMessageObject, IDocument> {
   findLastMessageTelegramId(): Promise<number>;
 }
 
-const UserSchema = new Schema<IDocument, IModel>(
+const Message = new Schema<IDocument, IModel>(
   {
     telegramId: {
       type: Types.String,
@@ -42,11 +42,11 @@ const UserSchema = new Schema<IDocument, IModel>(
   }
 );
 
-UserSchema.pre<IMessageObject>("save", function () {
+Message.pre<IMessageObject>("save", function () {
   this.updatedAt = new Date();
 });
 
-UserSchema.statics.findLastMessageTelegramId = async function (
+Message.statics.findLastMessageTelegramId = async function (
   msg: IMessage
 ): Promise<number> {
   try {
@@ -58,7 +58,7 @@ UserSchema.statics.findLastMessageTelegramId = async function (
     return undefined;
   }
 };
-UserSchema.statics.createIfNotExists = async function (
+Message.statics.createIfNotExists = async function (
     tgId: string
   ): Promise<void> {
     const msg =await Messages.findOne({telegramId: tgId});
@@ -67,6 +67,6 @@ UserSchema.statics.createIfNotExists = async function (
   }
 export const Messages = model<IDocument, IModel>(
   "Messages",
-  UserSchema,
+   Message,
   "Messages"
 );
