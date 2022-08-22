@@ -135,6 +135,10 @@ export class BotStrategies {
       // console.log(res.id);
       const text = res.text;
       const command = message.text.split(" ")[1];
+      if (command === undefined) {
+        ctx.reply("Введите команду корректно");
+        return;
+      }
       const data = message.text.split(" ").slice(2).join(" ");
       console.log("DATA:", data);
       // this.bot.telegram.sendMessage(
@@ -309,6 +313,12 @@ export class BotStrategies {
       await this.bot.telegram.copyMessage(userId, config.adminId, msgId);
       await ctx.deleteMessage();
     } catch (e) {
+      try {
+        if (e.response.error_code === 400)
+          await ctx.reply("Возникла ошибка при получении ДЗ!");
+      } catch (err) {
+        console.log(e);
+      }
       console.log(e);
     }
   }
@@ -370,7 +380,7 @@ export class BotStrategies {
   private async setHomework(ctx: Context) {
     try {
       const message = ctx.message as TgMessage;
-      if ("text" in message && message.text[0] == "/") return;
+      if ("text" in message && message.text[0] === "/") return;
       await Messages.createIfNotExists(message.message_id as unknown as string);
     } catch (e) {
       console.log(e);
@@ -386,11 +396,15 @@ export class BotStrategies {
           message.reply_to_message.forward_sender_name.split(" ")[0];
         const last_name =
           message.reply_to_message.forward_sender_name.split(" ")[1];
-        const user = await Users.findOne({
+        let user = await Users.findOne({
           first_name: first_name,
           last_name: last_name,
         });
-        // console.log("user is___________", user);
+        if (!user) {
+            user = await Users.findOne({
+            first_name: `${first_name} ${last_name}`,
+          });
+        }
         return user.telegramId;
       } else return String(message.reply_to_message.forward_from?.id);
     } catch (e) {
